@@ -63,8 +63,8 @@ const setAuthCookies = (
 ) => {
   res.cookie(ACCESS_COOKIE_NAME, accessToken, {
     httpOnly: true,
-    secure: env. === "production",
-    sameSite: "lax",
+    secure: env.NODE_ENV === "production",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: ACCESS_TOKEN_MAX_AGE,
     path: "/",
   });
@@ -72,7 +72,7 @@ const setAuthCookies = (
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
     secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: REFRESH_TOKEN_MAX_AGE,
     path: "/",
   });
