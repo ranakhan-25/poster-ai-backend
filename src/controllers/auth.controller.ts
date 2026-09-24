@@ -13,7 +13,31 @@ const REFRESH_COOKIE_NAME = "refreshToken";
 const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000; // 15 minutes
 const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// Create Access Token
+/**
+ * Cookie options
+ *
+ * Local:
+ *   sameSite = lax
+ *   secure = false
+ *
+ * Production:
+ *   sameSite = none
+ *   secure = true
+ *
+ * This is required because the frontend (Vercel)
+ * and backend (Render) are on different sites.
+ */
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: env.NODE_ENV === "production",
+  sameSite:
+    env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+  path: "/",
+});
+
+/**
+ * Create Access Token
+ */
 const signAccessToken = (id: string, role: string) =>
   jwt.sign(
     {
@@ -27,7 +51,9 @@ const signAccessToken = (id: string, role: string) =>
     } as jwt.SignOptions,
   );
 
-// Create Refresh Token
+/**
+ * Create Refresh Token
+ */
 const signRefreshToken = (id: string) =>
   jwt.sign(
     {
@@ -40,7 +66,9 @@ const signRefreshToken = (id: string) =>
     } as jwt.SignOptions,
   );
 
-// Return safe public user data
+/**
+ * Return safe public user data
+ */
 const publicUser = (u: {
   _id: unknown;
   name: string;
@@ -55,51 +83,47 @@ const publicUser = (u: {
   createdAt: u.createdAt,
 });
 
-// Set Access + Refresh Token cookies
+/**
+ * Set Access + Refresh Token cookies
+ */
 const setAuthCookies = (
   res: Response,
   accessToken: string,
   refreshToken: string,
 ) => {
+  const cookieOptions = getCookieOptions();
+
   res.cookie(ACCESS_COOKIE_NAME, accessToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    ...cookieOptions,
     maxAge: ACCESS_TOKEN_MAX_AGE,
-    path: "/",
   });
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+    ...cookieOptions,
     maxAge: REFRESH_TOKEN_MAX_AGE,
-    path: "/",
   });
 };
 
-// Clear Access + Refresh Token cookies
+/**
+ * Clear Access + Refresh Token cookies
+ */
 const clearAuthCookies = (res: Response) => {
-  res.clearCookie(ACCESS_COOKIE_NAME, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-    path: "/",
-  });
+  const cookieOptions = getCookieOptions();
 
-  res.clearCookie(REFRESH_COOKIE_NAME, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-    path: "/",
-  });
+  res.clearCookie(ACCESS_COOKIE_NAME, cookieOptions);
+
+  res.clearCookie(REFRESH_COOKIE_NAME, cookieOptions);
 };
 
-// Register
+/**
+ * Register
+ */
 export async function register(req: Request, res: Response) {
   const { name, email, password } = registerSchema.parse(req.body);
 
-  const existingUser = await User.exists({ email });
+  const existingUser = await User.exists({
+    email,
+  });
 
   if (existingUser) {
     throw new AppError(409, "An account with this email already exists");
@@ -127,11 +151,15 @@ export async function register(req: Request, res: Response) {
   });
 }
 
-// Login
+/**
+ * Login
+ */
 export async function login(req: Request, res: Response) {
   const { email, password } = loginSchema.parse(req.body);
 
-  const user = await User.findOne({ email }).select("+passwordHash");
+  const user = await User.findOne({
+    email,
+  }).select("+passwordHash");
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new AppError(401, "Invalid email or password");
@@ -151,7 +179,9 @@ export async function login(req: Request, res: Response) {
   });
 }
 
-// Refresh Access Token
+/**
+ * Refresh Access Token
+ */
 export async function refresh(req: Request, res: Response) {
   const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
 
@@ -182,14 +212,18 @@ export async function refresh(req: Request, res: Response) {
 
   const newAccessToken = signAccessToken(String(user._id), user.role);
 
-  // Only replace Access Token.
-  // Refresh Token remains valid until it expires.
+  /**
+   * IMPORTANT:
+   * Use the same production cookie
+   * settings as login/register.
+   *
+   * Production:
+   *   secure = true
+   *   sameSite = none
+   */
   res.cookie(ACCESS_COOKIE_NAME, newAccessToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...getCookieOptions(),
     maxAge: ACCESS_TOKEN_MAX_AGE,
-    path: "/",
   });
 
   return res.json({
@@ -200,7 +234,9 @@ export async function refresh(req: Request, res: Response) {
   });
 }
 
-// Current logged-in user
+/**
+ * Current logged-in user
+ */
 export async function me(req: Request, res: Response) {
   const user = await User.findById(req.user?.id);
 
@@ -216,8 +252,10 @@ export async function me(req: Request, res: Response) {
   });
 }
 
-// Logout
-export async function logout(req: Request, res: Response) {
+/**
+ * Logout
+ */
+export async function logout(_req: Request, res: Response) {
   clearAuthCookies(res);
 
   return res.json({
