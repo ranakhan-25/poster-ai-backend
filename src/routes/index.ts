@@ -13,6 +13,7 @@ router.post("/auth/register", authLimiter, asyncHandler(auth.register));
 router.post("/auth/login", authLimiter, asyncHandler(auth.login));
 router.post("/auth/refresh", authLimiter, asyncHandler(auth.refresh));
 router.get("/auth/me", requireAuth, asyncHandler(auth.me));
+router.post("/auth/logout", asyncHandler(auth.logout));
 
 router.get("/templates", asyncHandler(tpl.listTemplates));
 router.get("/templates/:id", asyncHandler(tpl.getTemplate));
